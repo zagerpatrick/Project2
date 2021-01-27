@@ -1,8 +1,8 @@
 
 import pytest
 
-test_partitioning():
+def test_partitioning():
 	assert True
 
-test_hierarchical():
+def test_hierarchical():
 	assert True
