@@ -90,7 +90,7 @@ class Ligand():
     'O=C(C)C'
     >>> Ligand.onbits
     [4, 6, 33, 397, 650, 807, 893, 1017]
-    >>> ligand_list = algs.ligand_reader('ligand_information.csv')
+    >>> ligand_list = ligand_reader('ligand_information.csv')
     >>> [ligand.list2array() for ligand in ligand_list]
     >>> Ligand.onbits_array[0, 0:10]
     array([0., 0., 0., 0., 1., 0., 1., 0., 0., 0.])
@@ -127,7 +127,7 @@ def jaccard_dis(x, c):
     Returns
     ----------
     score : lists of numpy.float64
-        An array of Jaccard distance of shape 
+        An array of Jaccard/Tanimoto distance of shape 
         x.m, c.m (x.shape[0], c.shape[0]).
     '''
 
@@ -141,8 +141,191 @@ def jaccard_dis(x, c):
 
 
 class HierarchicalClustering():
-	pass
+    '''
+    Single-linkage hierarchical clustering.
+    Cluster members are determined through Jaccard/Tanimoto distance.
+    
+    Parameters
+    ----------    
+    x : np.array
+        Values to be clustered. Values in array must be either zero or one.
+    thresh : int
+        Threshold value for determining cluster membership.
+        
+    Attributes
+    ----------
+    x : np.array
+        Values to be clustered. Values in array must be either zero or one.
+    thresh : int
+        Threshold value for determining cluster membership.
+    dis : np.array
+        Jaccard/Tanimoto distance matrix.
+    min_ind_list : list
+        List of step-wise clustering.
+    bl_array : np.array
+        Array of dendogram branch lengths.
+    dendo : list
+        List of dendogram hierarchy.
+    p_lab : np.array
+        Categorical cluster labels for cluster membership for data points.
 
+    References
+    ----------
+    1. Gower, John C., and Gavin JS Ross. 
+    "Minimum spanning trees and single linkage cluster analysis." 
+    Journal of the Royal Statistical Society: 
+    Series C (Applied Statistics) 18.1 (1969): 54-64.
+
+    Examples
+    --------
+    >>> SLC = algs.HierarchicalClustering(test, 0.42)
+    >>> p_lab = SLC.cluster()
+    >>> p_lab[0:10]
+    array([0, 1, 1, 1, 2, 0, 0, 0, 1, 0])
+    '''
+    
+    def __init__(self, x, thresh):
+        self.x = x
+        self.thresh = thresh
+        self.dis = np.array([])
+        self.min_ind_list = []
+        self.bl_array = np.array([])
+        self.dendo = []
+        self.p_lab = np.array([])
+       
+    def _single_linkage(self):
+        '''
+        Generate lists of branch indices and lengths 
+        through single-linkage clustering.
+        A helper function for the cluster function in the PartionClustering
+        class. Function should not be called directly.
+
+        Returns
+        ----------
+        min_ind_list : list
+            List of step-wise clustering.
+        bl_array : np.array
+            Array of dendogram branch lengths.
+        '''
+
+        # Determine dimmensions of input matrix
+        m, n = self.dis.shape[0], self.dis.shape[1]
+
+        # Initialize lists of branch indices and lengths
+        bl_list = [0]
+        min_ind_list = []
+
+        for i in range(0, m-1):
+            # Determine the index of the minimum value 
+            # on the right side of the diagonal
+            ind = np.where(self.dis == self.dis.min())
+            min_ind = np.array([ind[0][0], ind[1][0]])
+
+            # Calculate the branch length
+            bl = np.min(self.dis)/2
+
+            # Store values
+            min_ind_list.append(min_ind)
+            bl_list.append(bl)
+
+            # Merge clusters
+            up = np.min(self.dis[min_ind], axis=0)
+
+            # Update distance matrix
+            self.dis[min_ind[0], :] = up
+            self.dis[:, min_ind[0]] = up
+            self.dis = np.delete(self.dis, min_ind[1], 0)
+            self.dis = np.delete(self.dis, min_ind[1], 1)
+            np.fill_diagonal(self.dis, np.inf)
+
+        # Convert branch length list to np.array
+        bl_array = np.array(bl_list)
+        
+        return min_ind_list, bl_array
+    
+    
+    def _hierarch(self):
+        '''
+        Generate hierachical clustering structure from 
+        list of branch indices and lengths.
+        A helper function for the cluster function in the PartionClustering
+        class. Function should not be called directly.
+
+        Returns
+        ----------
+        dendo : list
+            List of dendogram hierarchy.
+        '''
+        # Generate first list of labels, where each point is it's own cluster
+        label_list = [[i] for i in range(0, len(self.min_ind_list)+1)]
+        # Inialize list of lists of labels
+        dendo = [label_list.copy()]
+
+        # Generate list of hierarchical structures.
+        for j,k in self.min_ind_list:
+            node_list = label_list.copy()
+
+            # Update labels given new cluster assignments
+            label_list[j] = label_list[j] + node_list[k]
+
+            # Remove labels that have been merged
+            label_list.pop(k)
+            dendo.append(label_list.copy())
+
+        return dendo
+
+
+    def _label_gen(self):
+        '''
+        Generates cluster labels.
+        A helper function for the cluster function in the PartionClustering
+        class. Function should not be called directly.
+
+        Returns
+        ----------
+        p_lab: np.array
+            Categorical cluster labels for cluster membership for data points.
+        '''
+        # Determine clustes given threshold
+        cluster_ind = np.where(self.bl_array <= self.thresh)[0][-1]
+        label_list = self.dendo[cluster_ind] 
+        
+        # Initialize labels array
+        p_lab = np.zeros(len(self.dendo))
+
+        for n, cluster in enumerate(label_list):
+            for p in cluster:
+                p_lab[p] = n
+
+        return p_lab
+    
+    
+    def cluster(self):
+        '''
+        Single-linkage hierarchical clustering.
+        
+        Returns
+        ----------
+        self.p_lab: np.array
+            Categorical cluster labels for cluster membership for data points.
+        '''
+        # Handeling of negative thresh input values
+        if self.thresh < 0: self.thresh = 0
+
+        # Calculate distance matrix
+        self.dis = jaccard_dis(self.x, self.x)
+        np.fill_diagonal(self.dis, np.inf)
+
+        # Generate lists of branch indices and lengths
+        self.min_ind_list, self.bl_array = self._single_linkage()
+
+        # Generate hierachical clustering structure
+        self.dendo = self._hierarch()
+        
+        # Determine cluster labels
+        self.p_lab = self._label_gen()
+
+        return self.p_lab
 
 class PartitionClustering():
     '''
@@ -176,7 +359,7 @@ class PartitionClustering():
 
     Examples
     --------
-    >>> kmodes = algs.PartitionClustering(ligand_array, n_clusters=5)
+    >>> kmodes = PartitionClustering(ligand_array, n_clusters=5)
     >>> c, c_lab, p_lab = kmodes.cluster()
     >>> c_lab
     array([0, 1, 2, 3, 4])
