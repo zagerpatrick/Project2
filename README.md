@@ -98,6 +98,21 @@
             x.m, c.m (x.shape[0], c.shape[0]).
 
 
+    silhouette_score(x, x_lab):
+    
+	    Calculates silhouette score.
+	    Parameters
+	    ----------
+	    x  : numpy.array
+	        Cluster values.
+	    x_lab : numpy.array
+	        A numpy array of cluster labels.
+	    Returns
+	    ----------
+	    si : float
+	        Per point silhouette score.
+
+
     rand_index(x, y):
 
         Calculates the Rand Index between to arrays of cluster labels.
