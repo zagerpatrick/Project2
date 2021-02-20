@@ -1,7 +1,7 @@
 # Project 2 - Clustering and Drug Discovery
 ## Due 02/17/2021
 
-![BuildStatus](https://github.com/ucsf-bmi-203-2021/Project2/workflows/HW2/badge.svg?event=push)
+![BuildStatus](https://github.com/zagerpatrick/Project2/workflows/HW2/badge.svg?event=push)
 
 ## API
 
