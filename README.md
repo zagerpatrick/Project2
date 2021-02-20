@@ -1,7 +1,7 @@
 # Project 2 - Clustering and Drug Discovery
 ## Due 02/17/2021
 
-![BuildStatus](https://github.com/zagerpatrick/Project2/workflows/HW2/badge.svg?event=push)
+[![HW2](https://github.com/zagerpatrick/Project2/actions/workflows/test.yml/badge.svg)](https://github.com/zagerpatrick/Project2/actions/workflows/test.yml)
 
 ## API
 
