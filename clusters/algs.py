@@ -1,6 +1,7 @@
-from csv import reader
+import itertools
 import random
 import numpy as np
+from csv import reader
 from scipy.stats import mode
 
 
@@ -23,6 +24,7 @@ def ligand_reader(file_name):
     ligand_list : list of ligand class instances
         List of instances of the ligand class from .csv file.
     '''
+
     ligand_list = []
 
     with open(file_name) as file:
@@ -41,10 +43,10 @@ class Ligand():
     '''
     Class for ligand data containing id's, docking scores, molecular id's,
     and ECFP onbits.
-    
+
     This class also contains the function to transform onbits from sting 
     format to np.array format.
-    
+
     Parameters
     ----------
     ligand_id : int
@@ -76,7 +78,7 @@ class Ligand():
     1. Weininger, David. "SMILES, a chemical language and information system. 
     1. Introduction to methodology and encoding rules." Journal of chemical 
     information and computer sciences 28.1 (1988): 31-36.
-    
+
     2. Rogers, David, and Mathew Hahn. "Extended-connectivity fingerprints."
     Journal of chemical information and modeling 50.5 (2010): 742-754.
 
@@ -95,13 +97,15 @@ class Ligand():
     >>> Ligand.onbits_array[0, 0:10]
     array([0., 0., 0., 0., 1., 0., 1., 0., 0., 0.])
     '''
+
     def __init__(self, ligand_id, score, smiles, onbits):
         self.ligand_id = ligand_id
         self.score = score
         self.smiles = smiles
         self.onbits = onbits
         self.onbits_array = []
-    
+
+
     def list2array(self):
         '''
         Convert onbits list to onbits binary array.
@@ -140,18 +144,62 @@ def jaccard_dis(x, c):
     return jd
 
 
+def rand_index(x, y):
+    '''
+    Calculates the Rand Index between to arrays of cluster labels.
+
+    Parameters
+    ----------
+    x  : numpy.array
+        A numpy array of cluster labels.
+    y : numpy.array
+        A numpy array of cluster labels.
+
+    Returns
+    ----------
+    r_ind : float
+        Rand Index value.
+    '''
+
+    # Initialize values
+    a = 0
+    b = 0
+
+    # Generate combinatorial iterables
+    x_comb = itertools.combinations(x, 2)
+    y_comb = itertools.combinations(y, 2)
+
+    # Calculate a and b values in Rand Index
+    for i, j in zip(x_comb, y_comb):
+
+        if i[0] == i[1] and j[0] == j[1]:
+            a += 1
+
+        if i[0] != i[1] and j[0] != j[1]:
+            b += 1
+
+    # Calculate total number of combinations of 2 in the  
+    n = len(x)
+    comb = .5*n*(n-1)
+
+    # Calculate Rand Index
+    r_ind = (a+b)/comb
+
+    return r_ind
+
+
 class HierarchicalClustering():
     '''
     Single-linkage hierarchical clustering.
     Cluster members are determined through Jaccard/Tanimoto distance.
-    
+
     Parameters
     ----------    
     x : np.array
         Values to be clustered. Values in array must be either zero or one.
     thresh : int
         Threshold value for determining cluster membership.
-        
+
     Attributes
     ----------
     x : np.array
@@ -183,7 +231,7 @@ class HierarchicalClustering():
     >>> p_lab[0:10]
     array([0, 1, 1, 1, 2, 0, 0, 0, 1, 0])
     '''
-    
+
     def __init__(self, x, thresh):
         self.x = x
         self.thresh = thresh
@@ -192,7 +240,8 @@ class HierarchicalClustering():
         self.bl_array = np.array([])
         self.dendo = []
         self.p_lab = np.array([])
-       
+
+
     def _single_linkage(self):
         '''
         Generate lists of branch indices and lengths 
@@ -240,10 +289,10 @@ class HierarchicalClustering():
 
         # Convert branch length list to np.array
         bl_array = np.array(bl_list)
-        
+
         return min_ind_list, bl_array
-    
-    
+
+
     def _hierarch(self):
         '''
         Generate hierachical clustering structure from 
@@ -256,8 +305,10 @@ class HierarchicalClustering():
         dendo : list
             List of dendogram hierarchy.
         '''
+
         # Generate first list of labels, where each point is it's own cluster
         label_list = [[i] for i in range(0, len(self.min_ind_list)+1)]
+
         # Inialize list of lists of labels
         dendo = [label_list.copy()]
 
@@ -286,10 +337,11 @@ class HierarchicalClustering():
         p_lab: np.array
             Categorical cluster labels for cluster membership for data points.
         '''
+
         # Determine clustes given threshold
         cluster_ind = np.where(self.bl_array <= self.thresh)[0][-1]
         label_list = self.dendo[cluster_ind] 
-        
+
         # Initialize labels array
         p_lab = np.zeros(len(self.dendo))
 
@@ -298,17 +350,18 @@ class HierarchicalClustering():
                 p_lab[p] = n
 
         return p_lab
-    
-    
+
+
     def cluster(self):
         '''
         Single-linkage hierarchical clustering.
-        
+
         Returns
         ----------
         self.p_lab: np.array
             Categorical cluster labels for cluster membership for data points.
         '''
+
         # Handeling of negative thresh input values
         if self.thresh < 0: self.thresh = 0
 
@@ -321,17 +374,18 @@ class HierarchicalClustering():
 
         # Generate hierachical clustering structure
         self.dendo = self._hierarch()
-        
+
         # Determine cluster labels
         self.p_lab = self._label_gen()
 
         return self.p_lab
 
+
 class PartitionClustering():
     '''
     k-modes clustering. Centroids are initialized though k-means++.
     Cluster members are determined through Jaccard/Tanimoto distance.
-    
+
     Parameters
     ----------    
     x : np.array
@@ -374,20 +428,20 @@ class PartitionClustering():
         self.c_lab = np.array([])
         self.p_lab = np.array([])
 
-    
+
     def _kmeansplusplus(self):
         '''
         Centroid initialization algorithm for k-means type clustering as
         described in "k-means++: The Advantages of Careful Seeding".
         A helper function for the cluster function in the PartionClustering
         class. Function should not be called directly.
-        
+
         Returns
         ----------
         self.c: np.array
             An array of initial centroid as determined by the k-means++.
-        
         '''
+
         # Select a data point at random to be the first centroid
         rand_int = random.randrange(len(self.x))
         self.c = self.x[rand_int: rand_int + 1]
@@ -450,7 +504,7 @@ class PartitionClustering():
         Calculates centroids accorinding to the mode of cluster members.
         A helper function for the cluster function in the PartionClustering
         class. Function should not be called directly.
-        
+
         Returns
         ----------
         self.c : np.array
@@ -468,7 +522,7 @@ class PartitionClustering():
     def cluster(self):
         '''
         k-modes clustering function.
-        
+
         Returns
         ----------
         c : np.array
@@ -478,6 +532,7 @@ class PartitionClustering():
         p_lab : np.array
             Categorical cluster labels for cluster membership for data points.
         '''
+
         # Determine dimmensions of input matrix
         m, n = self.x.shape[0], self.x.shape[1]
 
