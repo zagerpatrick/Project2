@@ -16,7 +16,7 @@ def ligand_reader(file_name):
 
     Parameters
     ----------
-    ligand_id : string
+    file_name : string
         Path to .csv file.
 
     Returns
@@ -144,6 +144,56 @@ def jaccard_dis(x, c):
     return jd
 
 
+def silhouette_score(x, x_lab):
+    '''
+    Calculates silhouette score.
+    
+    Parameters
+    ----------
+    x  : numpy.array
+        Cluster values.
+    x_lab : numpy.array
+        A numpy array of cluster labels.
+
+    Returns
+    ----------
+    si : float
+        Per point silhouette score.
+    '''
+    # Initialize lists
+    a, b = [], []
+
+    labels = np.unique(x_lab)
+    for lab in labels:
+        lab_ind = np.argwhere(x_lab == lab)
+
+        for i in lab_ind:
+            # Calculate ai
+            da = jaccard_dis(x[i], x[lab_ind.ravel()])[0]
+            if len(da) <= 1:
+                a.append(0)
+            else:
+                a.append(np.sum(da)/(len(da)-1))
+
+            # Calculate bi
+            full = np.arange(0, len(x_lab))
+            other_ind = np.setdiff1d(full, lab_ind)
+            db = jaccard_dis(x[i], x[other_ind.ravel()])[0]
+            b.append(np.min(db))
+    
+    # Calculate si
+    si = []
+    for ai, bi in zip(a, b):
+        if ai < bi:
+            si.append(1 - (ai/bi))
+        elif ai == bi:
+            si.append(0)
+        elif ai > bi:
+            si.append((bi/ai) - 1)
+    
+    return si
+
+
 def rand_index(x, y):
     '''
     Calculates the Rand Index between to arrays of cluster labels.
@@ -162,8 +212,7 @@ def rand_index(x, y):
     '''
 
     # Initialize values
-    a = 0
-    b = 0
+    a, b = 0, 0
 
     # Generate combinatorial iterables
     x_comb = itertools.combinations(x, 2)
